@@ -1,0 +1,27 @@
+.clickImage {
+    opacity: 0;
+    cursor: pointer;
+}
+
+.clickImage:hover {
+    opacity: .2
+}
+
+.clickImage-clicked {
+    stroke: yellow;
+    stroke-width: 2px;
+    opacity: .4;
+    cursor: pointer;
+}
+
+.clickImage-incorrect {
+    stroke: red;
+}
+
+.clickIamge-correct {
+    stroke: green;
+}
+
+.clickImage-container {
+    text-align: center;
+}

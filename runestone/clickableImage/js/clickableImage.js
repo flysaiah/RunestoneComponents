@@ -30,13 +30,13 @@ ClickableImage.prototype.init = function (opts) {
     this.divid = orig.id;
     this.useRunestoneServices = opts.useRunestoneServices;
 
-    // arrays for correct/incorrect indices of areas in the image map
-    this.correctAreas = [];
-    this.incorrectAreas = [];
+    this.clickableElements = [];   // will contain the HTML elements that are "clickable"
+    // arrays for correct/incorrect indices of areas in our clickable elements array
+    this.correctAreaIndices = [];
+    this.incorrectAreaIndices = [];
 
     this.getQuestion();
     this.getFeedback();
-    this.getImage();
     this.renderNewElements();
 };
 
@@ -70,35 +70,101 @@ ClickableImage.prototype.getFeedback = function () {
 ClickableImage.prototype.getImage = function () {
     for (var i = 0; i < this.origElem.childNodes.length; i++) {
         if ($(this.origElem.childNodes[i]).is("[data-source]")) {
-            this.clickImage = this.origElem.childNodes[i];
-            break;
+            var img = this.origElem.childNodes[i];
+            img.height = $(img).attr("data-height") ? $(img).attr("data-height") : img.height;
+            img.width = $(img).attr("data-width") ? $(img).attr("data-width") : img.width;
+            return this.origElem.childNodes[i];
         }
     }
 };
 
-ClickableImage.prototype.generateImageMap = function () {
-    // get original map, then strip the correct/incorrect attributes, saving the indices in this.correct and this.incorrect
-    var origMap;
+ClickableImage.prototype.prepareSVG = function () {
+    // get original svg, then strip the correct/incorrect attributes, saving the indices in this.correct and this.incorrect
+    // also add onclick listeners
     for (var i = 0; i < this.origElem.childNodes.length; i++) {
-        if ($(this.origElem.childNodes[i]).is("[data-map]")) {
-            origMap = this.origElem.childNodes[i];
+        if ($(this.origElem.childNodes[i]).is("[data-clickareas]")) {
+            this.clickableSVG = this.origElem.childNodes[i];
             break;
         }
     }
-    var generatedMap = document.createElement("map");
-    if (origMap) {
-        console.log(origMap);
-        for (var i = 0; i < origMap.childNodes.length; i++) {
-            var area = document.createElement("area");
-            $(area).attr("shape", $(origMap.childNodes[i]).attr("shape"));
-            $(area).attr("coords", $(origMap.childNodes[i]).attr("coords"));
-            if ($(origMap.childNodes[i]).is("[data-correct]")) {
-                console.log(origMap.childNodes[i]);
+    var index = 0;  // manual counter, because we cannot rely on the for loop index
+    for (var j = 0; j < this.clickableSVG.childNodes.length; j++) {
+        var child = this.clickableSVG.childNodes[j];
+        // check if child node is a child we want
+        if ($(child).is("[data-correct]") || $(child).is("[data-incorrect]")) {
+            // first, strip the data-correct / data-correct flags and log accordingly
+            if ($(child).is("[data-correct]")) {
+                $(child).removeAttr("data-correct")
+                this.correctAreaIndices.push(index);
+            } else if ($(child).is("[data-incorrect]")) {
+                $(child).removeAttr("data-incorrect")
+                 this.incorrectAreaIndices.push(index);
             }
+            $(child).addClass("clickImage");
+            index++;
+            // attach onclick listener -- adds CSS to communicate the "clicked" vs "unclicked" status to the user
+            child.onclick = function () {
+                if ($(this).hasClass("clickImage-clicked")) {
+                    $(this).removeClass("clickImage-clicked");
+                    $(this).addClass("clickImage");
+                    // $(this).removeClass("clickImage-incorrect");
+                    // $(this).removeClass("clickImage-correct");
+                } else {
+                    $(this).removeClass("clickImage");
+                    $(this).addClass("clickImage-clicked");
+                }
+            }
+            this.clickableElements.push(child);
         }
+
     }
-    return generatedMap;
-};
+}
+
+// ClickableImage.prototype.generateImageMap = function () {
+//     // get original map, then strip the correct/incorrect attributes, saving the indices in this.correct and this.incorrect
+//     var origMap;
+//     for (var i = 0; i < this.origElem.childNodes.length; i++) {
+//         if ($(this.origElem.childNodes[i]).is("[data-map]")) {
+//             origMap = this.origElem.childNodes[i];
+//             break;
+//         }
+//     }
+//     var generatedMap = document.createElement("map");
+//     var index = 0;   // manual counter, because we cannot rely on the for loop index
+//     if (origMap) {
+//         for (var j = 0; j < origMap.childNodes.length; j++) {
+//             console.log(origMap.childNodes[j]);
+//             if (origMap.childNodes[j].nodeName === "AREA") {
+//                 var area = document.createElement("area");
+//                 $(area).attr("shape", $(origMap.childNodes[j]).attr("shape"));
+//                 $(area).attr("coords", $(origMap.childNodes[j]).attr("coords"));
+//                 area.id = this.divid + "-" + index;
+//                 // attach listener
+//                 area.onclick = function () {
+//                     // TODO: Show/hide overlay div + accompanying CSS stuff needs to happen here
+//                     if ($(this).hasClass("clickImage-clicked")) {
+//                         $(this).removeClass("clickImage-clicked");
+//                         $(this).removeClass("clickImage-incorrect");
+//                     } else {
+//                         $(this).addClass("clickImage-clicked");
+//                     }
+//                 };
+//                 if ($(origMap.childNodes[j]).is("[data-correct]")) {
+//                     // log the relative index to correct arrays
+//                     this.correctAreaIndices.push(index);
+//                 } else {
+//                     // we assume that if they don't put data-correct, then it is incorrect
+//                     this.incorrectAreaIndices.push(index);
+//                 }
+//                 generatedMap.appendChild(area);
+//                 index += 1;
+//             }
+//         }
+//     }
+//     return generatedMap;
+// };
+
+// TODO: storage
 
 /*===========================================
 ====   Functions generating final HTML   ====
@@ -108,17 +174,83 @@ ClickableImage.prototype.renderNewElements = function () {
     // wrapper function for generating everything
     this.containerDiv = document.createElement("div");
     this.containerDiv.appendChild(this.question);
-    $(this.containerDiv).addClass("alert alert-warning");
+    $(this.containerDiv).addClass("alert alert-warning clickImage-container");
 
-    // the image that will be clickable
-    this.clickImage = document.createElement("img");
-    $(this.clickImage).attr("usemap", "#" + this.divid + "-map");
+    // instead of using an actual image element, we use a div and set it's background-image property
+    this.imageDiv = document.createElement("div");
+    var sourceImage = this.getImage();
+    // configure the url and size
+    this.imageDiv.style.backgroundImage = "url('" + sourceImage.src + "')";
+    this.imageDiv.style.backgroundSize = sourceImage.height + "px " + sourceImage.width + "px";
+    this.imageDiv.style.height = sourceImage.height + "px";
+    this.imageDiv.style.width = sourceImage.width + "px";
+    this.imageDiv.style.margin = "auto";
+    this.containerDiv.appendChild(this.imageDiv);
+
+    this.prepareSVG();   // defines this.clickableSVG
+    this.clickableSVG.style.height = sourceImage.height + "px";
+    this.clickableSVG.style.width = sourceImage.width + "px";
+    this.imageDiv.appendChild(this.clickableSVG);
+
+    this.createButtons();
+
+    this.feedBackDiv = document.createElement("div");
+    this.containerDiv.appendChild(document.createElement("br"));
+    this.containerDiv.appendChild(this.feedBackDiv);
 
     // map with correct/incorrect clickable areas
-    this.imageMap = this.generateImageMap();
-    this.imageMap.name = this.divid + "-map";
+    // this.imageMap = this.generateImageMap();
+    // this.imageMap.name = this.divid + "-map";
+    // this.containerDiv.appendChild(this.imageMap);
 
     $(this.origElem).replaceWith(this.containerDiv);
+};
+
+ClickableImage.prototype.createButtons = function () {
+    this.submitButton = document.createElement("button");    // Check me button
+    this.submitButton.textContent = "Check Me";
+    $(this.submitButton).attr({
+        "class": "btn btn-success",
+        "name": "do answer"
+    });
+
+    this.submitButton.onclick = function () {
+        this.clickableEval(true);
+    }.bind(this);
+
+    this.containerDiv.appendChild(this.submitButton);
+};
+
+ClickableImage.prototype.clickableEval = function () {
+    // Evaluation is done by iterating over the correct/incorrect arrays and checking by class
+    this.correct = true;
+    this.correctNum = 0;
+    this.incorrectNum = 0;
+    for (var i = 0; i < this.clickableElements.length; i++) {
+        var area = this.clickableElements[i];
+        // if it's correct and they clicked it, increment correctNum -- if incorrect and clicked, increment incorrectNum
+        if (this.correctAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
+            this.correctNum++;
+        } else if (this.incorrectAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
+            this.incorrectNum++;
+        }
+    }
+    if (this.correctNum != this.correctAreaIndices.length || this.incorrectNum !== 0) {
+        this.correct = false;
+    }
+    this.renderFeedback();
+};
+
+ClickableImage.prototype.renderFeedback = function () {
+    if (this.correct) {
+        $(this.feedBackDiv).html("You are Correct!");
+        $(this.feedBackDiv).attr("class", "alert alert-success");
+
+    } else {
+        $(this.feedBackDiv).html("Incorrect. You clicked on " + this.correctNum + " of the " + this.correctAreaIndices.length.toString() + " correct elements and " + this.incorrectNum + " of the " + this.incorrectAreaIndices.length.toString() + " incorrect elements. " + this.feedback);
+
+        $(this.feedBackDiv).attr("class", "alert alert-danger");
+    }
 };
 
 /*=================================
