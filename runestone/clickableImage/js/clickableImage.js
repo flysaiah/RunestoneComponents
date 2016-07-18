@@ -78,7 +78,7 @@ ClickableImage.prototype.getImage = function () {
     }
 };
 
-ClickableImage.prototype.prepareSVG = function () {
+ClickableImage.prototype.getSVG = function () {
     // get original svg, then strip the correct/incorrect attributes, saving the indices in this.correct and this.incorrect
     // also add onclick listeners
     for (var i = 0; i < this.origElem.childNodes.length; i++) {
@@ -86,37 +86,6 @@ ClickableImage.prototype.prepareSVG = function () {
             this.clickableSVG = this.origElem.childNodes[i];
             break;
         }
-    }
-    var index = 0;  // manual counter, because we cannot rely on the for loop index
-    for (var j = 0; j < this.clickableSVG.childNodes.length; j++) {
-        var child = this.clickableSVG.childNodes[j];
-        // check if child node is a child we want
-        if ($(child).is("[data-correct]") || $(child).is("[data-incorrect]")) {
-            // first, strip the data-correct / data-correct flags and log accordingly
-            if ($(child).is("[data-correct]")) {
-                $(child).removeAttr("data-correct")
-                this.correctAreaIndices.push(index);
-            } else if ($(child).is("[data-incorrect]")) {
-                $(child).removeAttr("data-incorrect")
-                 this.incorrectAreaIndices.push(index);
-            }
-            $(child).addClass("clickImage");
-            index++;
-            // attach onclick listener -- adds CSS to communicate the "clicked" vs "unclicked" status to the user
-            child.onclick = function () {
-                if ($(this).hasClass("clickImage-clicked")) {
-                    $(this).removeClass("clickImage-clicked");
-                    $(this).addClass("clickImage");
-                    // $(this).removeClass("clickImage-incorrect");
-                    // $(this).removeClass("clickImage-correct");
-                } else {
-                    $(this).removeClass("clickImage");
-                    $(this).addClass("clickImage-clicked");
-                }
-            }
-            this.clickableElements.push(child);
-        }
-
     }
 }
 
@@ -187,7 +156,7 @@ ClickableImage.prototype.renderNewElements = function () {
     this.imageDiv.style.margin = "auto";
     this.containerDiv.appendChild(this.imageDiv);
 
-    this.prepareSVG();   // defines this.clickableSVG
+    this.getSVG();   // defines this.clickableSVG
     this.clickableSVG.style.height = sourceImage.height + "px";
     this.clickableSVG.style.width = sourceImage.width + "px";
     this.imageDiv.appendChild(this.clickableSVG);
@@ -204,7 +173,48 @@ ClickableImage.prototype.renderNewElements = function () {
     // this.containerDiv.appendChild(this.imageMap);
 
     $(this.origElem).replaceWith(this.containerDiv);
+    this.checkLocalStorage();
 };
+
+ClickableImage.prototype.restoreAnswers = function (data) {
+    // If we were given data to pre-populate answers, then do so--otherwise, just finish setting up by preparing the SVG
+
+    var index = 0;  // manual counter, because we cannot rely on the for loop index
+    for (var j = 0; j < this.clickableSVG.childNodes.length; j++) {
+        var child = this.clickableSVG.childNodes[j];
+        // check if child node is a child we want
+        if ($(child).is("[data-correct]") || $(child).is("[data-incorrect]")) {
+            // first, strip the data-correct / data-correct flags and log accordingly
+            if ($(child).is("[data-correct]")) {
+                $(child).removeAttr("data-correct")
+                this.correctAreaIndices.push(index);
+            } else if ($(child).is("[data-incorrect]")) {
+                $(child).removeAttr("data-incorrect")
+                 this.incorrectAreaIndices.push(index);
+            }
+            if (this.clickedIndexes && this.clickedIndexes.indexOf(index.toString()) !== -1) {
+                $(child).addClass("clickImage-clicked");
+            } else {
+                $(child).addClass("clickImage");
+            }
+            index++;
+            // attach onclick listener -- adds CSS to communicate the "clicked" vs "unclicked" status to the user
+            child.onclick = function () {
+                if ($(this).hasClass("clickImage-clicked")) {
+                    $(this).removeClass("clickImage-clicked");
+                    $(this).addClass("clickImage");
+                    // $(this).removeClass("clickImage-incorrect");
+                    // $(this).removeClass("clickImage-correct");
+                } else {
+                    $(this).removeClass("clickImage");
+                    $(this).addClass("clickImage-clicked");
+                }
+            }
+            this.clickableElements.push(child);
+        }
+
+    }
+}
 
 ClickableImage.prototype.createButtons = function () {
     this.submitButton = document.createElement("button");    // Check me button
@@ -238,6 +248,7 @@ ClickableImage.prototype.clickableEval = function () {
     if (this.correctNum != this.correctAreaIndices.length || this.incorrectNum !== 0) {
         this.correct = false;
     }
+    this.setLocalStorage({"correct": (this.correct ? "T" : "F")});
     this.renderFeedback();
 };
 
@@ -251,6 +262,56 @@ ClickableImage.prototype.renderFeedback = function () {
 
         $(this.feedBackDiv).attr("class", "alert alert-danger");
     }
+};
+
+ClickableImage.prototype.setLocalStorage = function (data) {
+    // Array of the indices of clicked elements is passed to local storage
+    var answer;
+    if (data.answer !== undefined) {   // If we got data from the server, we can just use that
+        //answer = this.clickedIndexArray.join(";");
+    } else {
+        this.clickedIndexes = [];
+        for (var i = 0; i < this.clickableElements.length; i++) {
+            if ($(this.clickableElements[i]).hasClass("clickImage-clicked")) {
+                this.clickedIndexes.push(i);
+            }
+        }
+        answer = this.clickedIndexes.join(";");
+    }
+
+    var timeStamp = new Date();
+    var correct = data.correct;
+    var storageObject = {"answer": answer, "correct": correct, "timestamp": timeStamp};
+    // localStorage.setItem(eBookConfig.email + ":" + this.divid + "-given", JSON.stringify(storageObject));
+    // NOTE: Uncomment the above line when this is using Runestone to build
+    localStorage.setItem(this.divid + "-given", JSON.stringify(storageObject));
+};
+
+ClickableImage.prototype.checkLocalStorage = function () {
+    // Gets previous answer data from local storage if it exists
+    var len = localStorage.length;
+    if (len > 0) {
+        // NOTE: replace later
+        // var ex = localStorage.getItem(eBookConfig.email + ":" + this.divid + "-given");
+        var ex = localStorage.getItem(this.divid + "-given");
+        if (ex !== null) {
+            // TODO: add safety try/catch
+            var storageObj = JSON.parse(ex);
+            this.clickedIndexes = storageObj.answer.split(";");
+            // TODO: Uncomment & modify this for Runestone build
+            // if (this.useRunestoneServices) {
+            //     // log answer to server
+            //     this.givenIndexArray = [];
+            //     for (var i = 0; i < this.clickableArray.length; i++) {
+            //         if ($(this.clickableArray[i]).hasClass("clickable-clicked")) {
+            //             this.givenIndexArray.push(i);
+            //         }
+            //     }
+            //     this.logBookEvent({"event": "clickableArea", "act": this.clickedIndexArray.join(";"), "div_id": this.divid, "correct": storageObj.correct});
+            // }
+        }
+    }
+    this.restoreAnswers({});   // pass empty object
 };
 
 /*=================================
