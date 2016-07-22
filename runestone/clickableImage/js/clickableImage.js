@@ -110,7 +110,6 @@ ClickableImage.prototype.getSVG = function () {
 //                 area.id = this.divid + "-" + index;
 //                 // attach listener
 //                 area.onclick = function () {
-//                     // TODO: Show/hide overlay div + accompanying CSS stuff needs to happen here
 //                     if ($(this).hasClass("clickImage-clicked")) {
 //                         $(this).removeClass("clickImage-clicked");
 //                         $(this).removeClass("clickImage-incorrect");
@@ -240,8 +239,10 @@ ClickableImage.prototype.clickableEval = function () {
         var area = this.clickableElements[i];
         // if it's correct and they clicked it, increment correctNum -- if incorrect and clicked, increment incorrectNum
         if (this.correctAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
+            $(area).addClass("clickImage-correct");
             this.correctNum++;
         } else if (this.incorrectAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
+            $(area).addClass("clickImage-incorrect");
             this.incorrectNum++;
         }
     }
