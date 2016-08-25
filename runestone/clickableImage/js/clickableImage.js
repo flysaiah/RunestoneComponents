@@ -87,7 +87,7 @@ ClickableImage.prototype.getSVG = function () {
             break;
         }
     }
-}
+};
 
 // ClickableImage.prototype.generateImageMap = function () {
 //     // get original map, then strip the correct/incorrect attributes, saving the indices in this.correct and this.incorrect
@@ -185,35 +185,44 @@ ClickableImage.prototype.restoreAnswers = function (data) {
         if ($(child).is("[data-correct]") || $(child).is("[data-incorrect]")) {
             // first, strip the data-correct / data-correct flags and log accordingly
             if ($(child).is("[data-correct]")) {
-                $(child).removeAttr("data-correct")
+                $(child).removeAttr("data-correct");
                 this.correctAreaIndices.push(index);
             } else if ($(child).is("[data-incorrect]")) {
-                $(child).removeAttr("data-incorrect")
+                $(child).removeAttr("data-incorrect");
                  this.incorrectAreaIndices.push(index);
             }
             if (this.clickedIndexes && this.clickedIndexes.indexOf(index.toString()) !== -1) {
-                $(child).addClass("clickImage-clicked");
+                // Can't use addClass because our version of jQuery doesn't support that usage for SVGs
+                // TODO: Figure out better workaround for addClass with SVGs
+                //$(child).addClass("clickImage-clicked");
+                $(child).attr("class", "clickImage-clicked");
             } else {
-                $(child).addClass("clickImage");
+                //$(child).addClass("clickImage");
+                $(child).attr("class", "clickImage");
             }
             index++;
             // attach onclick listener -- adds CSS to communicate the "clicked" vs "unclicked" status to the user
             child.onclick = function () {
-                if ($(this).hasClass("clickImage-clicked")) {
-                    $(this).removeClass("clickImage-clicked");
-                    $(this).addClass("clickImage");
-                    // $(this).removeClass("clickImage-incorrect");
-                    // $(this).removeClass("clickImage-correct");
+                // if ($(this).hasClass("clickImage-clicked")) {
+                //     $(this).removeClass("clickImage-clicked");
+                //     $(this).addClass("clickImage");
+                //     // $(this).removeClass("clickImage-incorrect");
+                //     // $(this).removeClass("clickImage-correct");
+                // } else {
+                //     $(this).removeClass("clickImage");
+                //     $(this).addClass("clickImage-clicked");
+                // }
+                if ($(this).attr("class") == "clickImage-clicked") {
+                    $(this).attr("class", "clickImage");
                 } else {
-                    $(this).removeClass("clickImage");
-                    $(this).addClass("clickImage-clicked");
+                    $(this).attr("class", "clickImage-clicked");
                 }
-            }
+            };
             this.clickableElements.push(child);
         }
 
     }
-}
+};
 
 ClickableImage.prototype.createButtons = function () {
     this.submitButton = document.createElement("button");    // Check me button
@@ -238,11 +247,13 @@ ClickableImage.prototype.clickableEval = function () {
     for (var i = 0; i < this.clickableElements.length; i++) {
         var area = this.clickableElements[i];
         // if it's correct and they clicked it, increment correctNum -- if incorrect and clicked, increment incorrectNum
-        if (this.correctAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
-            $(area).addClass("clickImage-correct");
+        if (this.correctAreaIndices.indexOf(i) !== -1 && $(area).attr("class") == "clickImage-clicked") {
+        //if (this.correctAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
+            // $(area).addClass("clickImage-correct");
             this.correctNum++;
-        } else if (this.incorrectAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
-            $(area).addClass("clickImage-incorrect");
+        } else if (this.incorrectAreaIndices.indexOf(i) !== -1 && $(area).attr("class") == "clickImage-clicked") {
+        // } else if (this.incorrectAreaIndices.indexOf(i) !== -1 && $(area).hasClass("clickImage-clicked")) {
+            // $(area).addClass("clickImage-incorrect");
             this.incorrectNum++;
         }
     }
@@ -273,7 +284,8 @@ ClickableImage.prototype.setLocalStorage = function (data) {
     } else {
         this.clickedIndexes = [];
         for (var i = 0; i < this.clickableElements.length; i++) {
-            if ($(this.clickableElements[i]).hasClass("clickImage-clicked")) {
+            // if ($(this.clickableElements[i]).hasClass("clickImage-clicked")) {
+            if ($(this.clickableElements[i]).attr("class") == "clickImage-clicked") {
                 this.clickedIndexes.push(i);
             }
         }
